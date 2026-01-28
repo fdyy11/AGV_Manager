@@ -1,4 +1,3 @@
-// java
 package com.example.service;
 
 import com.example.common.config.TcpStatusWebSocketHandler;
@@ -9,6 +8,8 @@ import javax.annotation.PreDestroy;
 import java.io.*;
 import java.net.*;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,6 +26,8 @@ public class TcpConnectionService {
     private final List<Socket> clientSockets = new CopyOnWriteArrayList<>();
     private final List<String> receivedMessages = new CopyOnWriteArrayList<>();
     private final AtomicInteger clientCount = new AtomicInteger(0);
+    // 添加客户端连接映射表
+    private final Map<String, Socket> clientConnections = new ConcurrentHashMap<>();
 
     public boolean startServer(int port) {
         try {
@@ -63,6 +66,11 @@ public class TcpConnectionService {
                 clientSocket.setKeepAlive(true);
 
                 clientSockets.add(clientSocket);
+
+                // 生成客户端ID并添加到映射表
+                String clientId = generateClientId(clientSocket);
+                clientConnections.put(clientId, clientSocket);
+
                 int cur = clientCount.incrementAndGet();
                 System.out.println("Accepted connection from " + clientSocket.getRemoteSocketAddress() + ", clientCount=" + cur);
 
@@ -133,6 +141,13 @@ public class TcpConnectionService {
 
     private void cleanupClient(Socket socket) {
         boolean removed = clientSockets.remove(socket);
+
+        // 从客户端连接映射表中移除
+        String clientId = findClientIdBySocket(socket);
+        if (clientId != null) {
+            clientConnections.remove(clientId);
+        }
+
         if (removed) {
             int current = clientCount.decrementAndGet();
             System.out.println("客户端断开: " + socket.getRemoteSocketAddress() + ", clientCount=" + current);
@@ -203,6 +218,7 @@ public class TcpConnectionService {
             }
 
             clientSockets.clear();
+            clientConnections.clear(); // 清空客户端连接映射表
             clientCount.set(0);
             broadcastStatus();
             System.out.println("TCP 服务器已停止");
@@ -272,5 +288,47 @@ public class TcpConnectionService {
     @PreDestroy
     public void destroy() {
         stopServer();
+    }
+
+    // 生成客户端ID的方法
+    private String generateClientId(Socket socket) {
+        return socket.getRemoteSocketAddress().toString() + "_" + System.currentTimeMillis();
+    }
+
+    // 根据Socket查找客户端ID
+    private String findClientIdBySocket(Socket socket) {
+        for (Map.Entry<String, Socket> entry : clientConnections.entrySet()) {
+            if (entry.getValue().equals(socket)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    // 发送消息给特定客户端
+    public void sendMessageToSpecificClient(String clientId, String message) {
+        if (clientConnections.containsKey(clientId)) {
+            Socket clientSocket = clientConnections.get(clientId);
+            try {
+                if (!clientSocket.isClosed() && clientSocket.isConnected()) {
+                    PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                    out.println(message);
+                    out.flush();
+                } else {
+                    // 如果连接已断开，从映射表中移除
+                    clientConnections.remove(clientId);
+                }
+            } catch (IOException e) {
+                System.err.println("发送消息到特定客户端失败: " + e.getMessage());
+                try {
+                    clientSocket.close();
+                } catch (IOException ex) {
+                    // ignore
+                }
+                clientConnections.remove(clientId);
+            }
+        } else {
+            System.err.println("客户端ID不存在: " + clientId);
+        }
     }
 }

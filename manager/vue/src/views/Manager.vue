@@ -59,6 +59,16 @@
             </template>
             <el-menu-item index="/admin">管理员信息</el-menu-item>
           </el-submenu>
+
+          <!-- 在侧边栏菜单中添加新的菜单项 -->
+          <el-submenu index="logistics">
+            <template slot="title">
+              <i class="el-icon-menu"></i><span>物流管理</span>
+            </template>
+            <el-menu-item index="/agv-monitor">AGV监控</el-menu-item>
+            <el-menu-item index="/task-scheduler">任务调度</el-menu-item>
+          </el-submenu>
+
         </el-menu>
       </div>
 

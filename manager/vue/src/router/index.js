@@ -27,6 +27,18 @@ const routes = [
         name: 'TCPServer',
         meta: { name: 'TCP服务器' },
         component: () => import('../views/manager/TCPServer.vue')  // 注意：需要将 TCP_server.vue 重命名为 TCPServer.vue
+      },
+      {
+        path: 'agv-monitor',
+        name: 'AgvMonitor',
+        meta: { name: 'AGV监控' },
+        component: () => import('../views/manager/AgvMonitor.vue')
+      },
+      {
+        path: 'task-scheduler',
+        name: 'TaskScheduler',
+        meta: { name: '任务调度' },
+        component: () => import('../views/manager/TaskScheduler.vue')
       }
     ]
   },

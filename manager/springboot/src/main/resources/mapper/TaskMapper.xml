@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.TaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.entity.Task">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="task_type" property="taskType"/>
+        <result column="material_type" property="materialType"/>
+        <result column="quantity" property="quantity"/>
+        <result column="start_point" property="startPoint"/>
+        <result column="end_point" property="endPoint"/>
+        <result column="agv_id" property="agvId"/>
+        <result column="status" property="status"/>
+        <result column="priority" property="priority"/>
+        <result column="create_time" property="createTime"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="need_time" property="needTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, task_id, task_type, material_type, quantity, start_point, end_point,
+        agv_id, status, priority, create_time, start_time, end_time, need_time
+    </sql>
+
+    <insert id="insert" parameterType="com.example.entity.Task">
+        INSERT INTO task (
+        <include refid="Base_Column_List"/>
+        ) VALUES (
+        #{id}, #{taskId}, #{taskType}, #{materialType}, #{quantity},
+        #{startPoint}, #{endPoint}, #{agvId}, #{status}, #{priority},
+        #{createTime}, #{startTime}, #{endTime}, #{needTime}
+        )
+    </insert>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM task WHERE id = #{id}
+    </delete>
+
+    <update id="updateById" parameterType="com.example.entity.Task">
+        UPDATE task
+        <set>
+            <if test="taskId != null and taskId != ''">
+                task_id = #{taskId},
+            </if>
+            <if test="taskType != null and taskType != ''">
+                task_type = #{taskType},
+            </if>
+            <if test="materialType != null and materialType != ''">
+                material_type = #{materialType},
+            </if>
+            <if test="quantity != null">
+                quantity = #{quantity},
+            </if>
+            <if test="startPoint != null and startPoint != ''">
+                start_point = #{startPoint},
+            </if>
+            <if test="endPoint != null and endPoint != ''">
+                end_point = #{endPoint},
+            </if>
+            <if test="agvId != null and agvId != ''">
+                agv_id = #{agvId},
+            </if>
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+            <if test="priority != null and priority != ''">
+                priority = #{priority},
+            </if>
+            <if test="startTime != null">
+                start_time = #{startTime},
+            </if>
+            <if test="endTime != null">
+                end_time = #{endTime},
+            </if>
+            <if test="needTime != null">
+                need_time = #{needTime},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM task
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" parameterType="com.example.entity.Task" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM task
+        <where>
+            <if test="taskId != null and taskId != ''">
+                AND task_id LIKE CONCAT('%', #{taskId}, '%')
+            </if>
+            <if test="taskType != null and taskType != ''">
+                AND task_type = #{taskType}
+            </if>
+            <if test="materialType != null and materialType != ''">
+                AND material_type LIKE CONCAT('%', #{materialType}, '%')
+            </if>
+            <if test="startPoint != null and startPoint != ''">
+                AND start_point = #{startPoint}
+            </if>
+            <if test="endPoint != null and endPoint != ''">
+                AND end_point = #{endPoint}
+            </if>
+            <if test="agvId != null and agvId != ''">
+                AND agv_id = #{agvId}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="priority != null and priority != ''">
+                AND priority = #{priority}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+</mapper>

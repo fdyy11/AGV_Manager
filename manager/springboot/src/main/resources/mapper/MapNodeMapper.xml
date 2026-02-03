@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.MapNodeMapper">
+
+    <resultMap type="com.example.entity.MapNode" id="MapNodeResultMap">
+        <id property="id" column="id"/>
+        <result property="nodeId" column="node_id"/>
+        <result property="x" column="x"/>
+        <result property="y" column="y"/>
+        <result property="nodeType" column="node_type"/>
+        <result property="description" column="description"/>
+        <result property="capacity" column="capacity"/>
+        <result property="isAvailable" column="is_available"/>
+    </resultMap>
+
+    <resultMap type="com.example.entity.MapEdge" id="MapEdgeResultMap">
+        <id property="id" column="id"/>
+        <result property="fromNodeId" column="from_node_id"/>
+        <result property="toNodeId" column="to_node_id"/>
+        <result property="weight" column="weight"/>
+        <result property="edgeType" column="edge_type"/>
+    </resultMap>
+
+    <!-- 查询单个节点 -->
+    <select id="selectByNodeId" parameterType="string" resultMap="MapNodeResultMap">
+        SELECT * FROM map_node WHERE node_id = #{nodeId}
+    </select>
+
+    <!-- 获取相邻节点 -->
+    <select id="getNeighbors" parameterType="string" resultType="string">
+        SELECT DISTINCT
+            CASE
+                WHEN from_node_id = #{nodeId} THEN to_node_id
+                WHEN to_node_id = #{nodeId} THEN from_node_id
+                END as neighbor_node
+        FROM map_edge
+        WHERE from_node_id = #{nodeId} OR to_node_id = #{nodeId}
+            AND CASE
+                    WHEN from_node_id = #{nodeId} THEN to_node_id
+                    WHEN to_node_id = #{nodeId} THEN from_node_id
+                                              END IS NOT NULL
+    </select>
+
+    <!-- 获取所有节点 -->
+    <select id="selectAllNodes" resultMap="MapNodeResultMap">
+        SELECT * FROM map_node ORDER BY id
+    </select>
+
+    <!-- 插入节点 -->
+    <insert id="insertNode" parameterType="com.example.entity.MapNode">
+        INSERT INTO map_node (node_id, x, y, node_type, description, capacity, is_available)
+        VALUES (#{nodeId}, #{x}, #{y}, #{nodeType}, #{description}, #{capacity}, #{isAvailable})
+    </insert>
+
+    <!-- 清空所有节点 -->
+    <delete id="deleteAllNodes">
+        DELETE FROM map_node
+    </delete>
+
+    <!-- 获取所有边 -->
+    <select id="selectAllEdges" resultMap="MapEdgeResultMap">
+        SELECT * FROM map_edge ORDER BY id
+    </select>
+
+    <!-- 插入边 -->
+    <insert id="insertEdge" parameterType="com.example.entity.MapEdge">
+        INSERT INTO map_edge (from_node_id, to_node_id, weight, edge_type)
+        VALUES (#{fromNodeId}, #{toNodeId}, #{weight}, #{edgeType})
+    </insert>
+
+    <!-- 清空所有边 -->
+    <delete id="deleteAllEdges">
+        DELETE FROM map_edge
+    </delete>
+
+</mapper>

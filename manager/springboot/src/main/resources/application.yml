@@ -5,7 +5,6 @@ agv:
   charging-duration: 120  # 充电持续时间(分钟)
   max-task-queue: 10  # 最大任务队列长度
 
-
 server:
   port: 9090
 
@@ -20,6 +19,9 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
 
 # 配置mybatis实体和xml映射
 mybatis:

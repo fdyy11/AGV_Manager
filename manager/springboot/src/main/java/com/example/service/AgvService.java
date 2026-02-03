@@ -72,15 +72,11 @@ public class AgvService {
      * 为AGV分配任务
      */
     public void assignTaskToAgv(String agvId, String taskId) {
-        // 构造任务命令并发送给AGV
-        String command = String.format("{\"command\":\"ASSIGN_TASK\",\"taskId\":\"%s\"}", taskId);
-
-        // 检查AGV是否在线后再发送消息
-        Agv agv = agvMapper.selectByAgvId(agvId); // 需要在mapper中添加此方法
-        if (agv != null && agv.getIsOnline()) {
-            tcpConnectionService.sendMessageToSpecificClient(agvId, command);
-        } else {
-            throw new RuntimeException("AGV设备不在线，无法分配任务");
+        // 更新AGV的当前任务
+        Agv agv = agvMapper.selectByAgvId(agvId);
+        if (agv != null) {
+            agv.setAssignedTask(taskId);
+            agvMapper.updateByAgvId(agv);
         }
     }
 

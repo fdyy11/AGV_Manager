@@ -31,41 +31,51 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Resource
     private AdminService adminService;
 
+    // 在 JwtInterceptor 中确保路径被正确处理
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        // 1. 从http请求的header中获取token
+        // 添加调试日志
+        String uri = request.getRequestURI();
+        System.out.println("Intercepting request: " + uri);
+
+        // 从header或参数获取token
         String token = request.getHeader(Constants.TOKEN);
         if (ObjectUtil.isEmpty(token)) {
-            // 如果没拿到，从参数里再拿一次
             token = request.getParameter(Constants.TOKEN);
         }
-        // 2. 开始执行认证
+
+        // 检查token是否存在
         if (ObjectUtil.isEmpty(token)) {
             throw new CustomException(ResultCodeEnum.TOKEN_INVALID_ERROR);
         }
+
         Account account = null;
         try {
-            // 解析token获取存储的数据
             String userRole = JWT.decode(token).getAudience().get(0);
             String userId = userRole.split("-")[0];
             String role = userRole.split("-")[1];
-            // 根据userId查询数据库
+
             if (RoleEnum.ADMIN.name().equals(role)) {
                 account = adminService.selectById(Integer.valueOf(userId));
             }
         } catch (Exception e) {
+            System.out.println("Token decode error: " + e.getMessage());
             throw new CustomException(ResultCodeEnum.TOKEN_CHECK_ERROR);
         }
+
         if (ObjectUtil.isNull(account)) {
             throw new CustomException(ResultCodeEnum.USER_NOT_EXIST_ERROR);
         }
+
         try {
-            // 用户密码加签验证 token
             JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256(account.getPassword())).build();
-            jwtVerifier.verify(token); // 验证token
+            jwtVerifier.verify(token);
         } catch (JWTVerificationException e) {
+            System.out.println("Token verification error: " + e.getMessage());
             throw new CustomException(ResultCodeEnum.TOKEN_CHECK_ERROR);
         }
+
         return true;
     }
+
 }

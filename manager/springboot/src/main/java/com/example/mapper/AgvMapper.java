@@ -42,7 +42,5 @@ public interface AgvMapper {
     /**
      * 根据AGV ID查询
      */
-// 在AgvMapper接口中添加
     Agv selectByAgvId(@Param("agvId") String agvId);
-
 }

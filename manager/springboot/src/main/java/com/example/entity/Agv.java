@@ -1,5 +1,6 @@
 package com.example.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -17,7 +18,10 @@ public class Agv implements Serializable {
     private String carryingMaterial; // 承载物料
     private String assignedTask;     // 当前任务
     private Double speed;            // 当前速度
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date lastUpdateTime;     // 最后更新时间
+
     private String ipAddress;        // IP地址
     private String macAddress;       // MAC地址
     private Boolean isOnline;        // 是否在线

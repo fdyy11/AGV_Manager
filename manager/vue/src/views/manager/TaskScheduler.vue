@@ -66,8 +66,16 @@
         </el-table-column>
         <el-table-column prop="materialType" label="物料类型" width="120" />
         <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column prop="startPoint" label="起点" width="100" />
-        <el-table-column prop="endPoint" label="终点" width="100" />
+        <el-table-column prop="startPoint" label="起点" width="100">
+          <template v-slot="scope">
+            <span>{{ getNodeDescription(scope.row.startPoint) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="endPoint" label="终点" width="100">
+          <template v-slot="scope">
+            <span>{{ getNodeDescription(scope.row.endPoint) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="agvId" label="分配AGV" width="100" />
         <el-table-column prop="status" label="状态" width="100">
           <template v-slot="scope">
@@ -84,7 +92,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="180">
+        <!-- 修改操作列的宽度为220，确保三个按钮在同一行 -->
+        <el-table-column label="操作" width="220">
           <template v-slot="scope">
             <el-button size="mini" @click="viewTaskDetails(scope.row)">详情</el-button>
             <el-button
@@ -133,21 +142,21 @@
           <el-input-number v-model="newTask.quantity" :min="1" :max="1000"></el-input-number>
         </el-form-item>
         <el-form-item label="起点位置" prop="startPoint">
-          <el-select v-model="newTask.startPoint" placeholder="选择起点位置">
+          <el-select v-model="newTask.startPoint" placeholder="选择起点位置" filterable>
             <el-option
-                v-for="node in storageNodes"
+                v-for="node in allStorageNodes"
                 :key="node.nodeId"
-                :label="node.nodeId + ' - ' + node.description"
+                :label="`${node.nodeId} - ${node.description || node.nodeType}`"
                 :value="node.nodeId"
             />
           </el-select>
         </el-form-item>
         <el-form-item label="终点位置" prop="endPoint">
-          <el-select v-model="newTask.endPoint" placeholder="选择终点位置">
+          <el-select v-model="newTask.endPoint" placeholder="选择终点位置" filterable>
             <el-option
-                v-for="node in assemblyNodes"
+                v-for="node in allAssemblyNodes"
                 :key="node.nodeId"
-                :label="node.nodeId + ' - ' + node.description"
+                :label="`${node.nodeId} - ${node.description || node.nodeType}`"
                 :value="node.nodeId"
             />
           </el-select>
@@ -187,8 +196,12 @@
           </el-descriptions-item>
           <el-descriptions-item label="物料类型">{{ selectedTask.materialType }}</el-descriptions-item>
           <el-descriptions-item label="数量">{{ selectedTask.quantity }}</el-descriptions-item>
-          <el-descriptions-item label="起点">{{ selectedTask.startPoint }}</el-descriptions-item>
-          <el-descriptions-item label="终点">{{ selectedTask.endPoint }}</el-descriptions-item>
+          <el-descriptions-item label="起点">
+            {{ getNodeDescription(selectedTask.startPoint) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="终点">
+            {{ getNodeDescription(selectedTask.endPoint) }}
+          </el-descriptions-item>
           <el-descriptions-item label="分配AGV">{{ selectedTask.agvId || '未分配' }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="getTaskStatusTag(selectedTask.status)">
@@ -240,8 +253,9 @@ export default {
         priority: 'medium',
         needTime: null
       },
-      storageNodes: [],
-      assemblyNodes: [],
+      allStorageNodes: [],
+      allAssemblyNodes: [],
+      allMapNodes: [], // 存储所有地图节点
       taskRules: {
         taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
         materialType: [{ required: true, message: '请输入物料类型', trigger: 'blur' }],
@@ -254,7 +268,7 @@ export default {
 
   mounted() {
     this.loadTasks(1);
-    this.loadMapNodes();
+    this.loadAllMapNodes(); // 加载所有地图节点
     this.loadStats();
   },
 
@@ -280,16 +294,35 @@ export default {
       }
     },
 
-    async loadMapNodes() {
+    // 加载所有地图节点
+    async loadAllMapNodes() {
       try {
         const response = await request.get('/map/nodes');
-        const allNodes = response.data || [];
+        this.allMapNodes = response.data || [];
 
-        this.storageNodes = allNodes.filter(node => node.nodeType === 'storage');
-        this.assemblyNodes = allNodes.filter(node => node.nodeType === 'assembly');
+        // 按类型分类节点
+        this.allStorageNodes = this.allMapNodes.filter(node => node.nodeType === 'storage' || node.nodeType === 'warehouse');
+        this.allAssemblyNodes = this.allMapNodes.filter(node => node.nodeType === 'assembly' || node.nodeType === 'workstation' || node.nodeType === 'station');
+
+        // 如果没有按类型分类的节点，使用所有节点
+        if (this.allStorageNodes.length === 0) {
+          this.allStorageNodes = this.allMapNodes;
+        }
+        if (this.allAssemblyNodes.length === 0) {
+          this.allAssemblyNodes = this.allMapNodes;
+        }
       } catch (error) {
         console.error('加载地图节点失败:', error);
       }
+    },
+
+    // 根据节点ID获取节点描述
+    getNodeDescription(nodeId) {
+      const node = this.allMapNodes.find(n => n.nodeId === nodeId);
+      if (node) {
+        return `${node.nodeId}${node.description ? ' - ' + node.description : ''}`;
+      }
+      return nodeId || '未设置';
     },
 
     async loadStats() {
@@ -407,22 +440,63 @@ export default {
       });
     },
 
-    submitTask() {
+// 在 TaskScheduler.vue 中优化请求处理
+// 在 TaskScheduler.vue 中优化请求处理
+    async submitTask() {
       this.$refs.taskForm.validate(async (valid) => {
         if (valid) {
           try {
-            await request.post('/task/create', this.newTask);
-            this.$message.success('任务创建成功');
-            this.createTaskDialog = false;
-            this.resetForm();
-            this.loadTasks(1);
+            // 确保时间格式正确
+            const taskData = { ...this.newTask };
+
+            // 如果needTime为空，设为null而不是undefined
+            if (!taskData.needTime) {
+              taskData.needTime = null;
+            } else {
+              // 确保日期格式为字符串格式
+              if (taskData.needTime instanceof Date) {
+                taskData.needTime = this.formatDate(taskData.needTime);
+              }
+            }
+
+            console.log('发送任务数据:', taskData);
+
+            const response = await request.post('/task/create', taskData);
+            console.log('任务创建响应:', response);
+
+            if (response.code === '200') {
+              this.$message.success('任务创建成功');
+              this.createTaskDialog = false;
+              this.resetForm();
+              this.loadTasks(1);
+            } else {
+              this.$message.error(response.msg || '任务创建失败');
+            }
           } catch (error) {
             console.error('创建任务失败:', error);
-            this.$message.error('创建任务失败: ' + (error.response?.data?.msg || error.message));
+            // 显示更详细的错误信息
+            if (error.response && error.response.data) {
+              this.$message.error('创建任务失败: ' + (error.response.data.msg || error.response.data));
+            } else {
+              this.$message.error('创建任务失败: ' + (error.message || '网络错误'));
+            }
           }
         }
       });
     },
+
+// 添加日期格式化方法
+    formatDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+    ,
 
     resetForm() {
       this.newTask = {

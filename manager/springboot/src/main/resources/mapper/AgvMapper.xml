@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.AgvMapper">
+
+    <resultMap type="com.example.entity.Agv" id="AgvResultMap">
+        <id property="id" column="id"/>
+        <result property="agvId" column="agv_id"/>
+        <result property="currentLocation" column="current_location"/>
+        <result property="status" column="status"/>
+        <result property="batteryLevel" column="battery_level"/>
+        <result property="carryingMaterial" column="carrying_material"/>
+        <result property="assignedTask" column="assigned_task"/>
+        <result property="speed" column="speed"/>
+        <result property="lastUpdateTime" column="last_update_time"/>
+        <result property="ipAddress" column="ip_address"/>
+        <result property="macAddress" column="mac_address"/>
+        <result property="isOnline" column="is_online"/>
+    </resultMap>
+
+    <!-- 插入AGV -->
+    <insert id="insert" parameterType="com.example.entity.Agv">
+        INSERT INTO agv (agv_id, current_location, status, battery_level,
+                         carrying_material, assigned_task, speed,
+                         last_update_time, ip_address, mac_address, is_online)
+        VALUES (#{agvId}, #{currentLocation}, #{status}, #{batteryLevel},
+                #{carryingMaterial}, #{assignedTask}, #{speed},
+                #{lastUpdateTime}, #{ipAddress}, #{macAddress}, #{isOnline})
+    </insert>
+
+    <!-- 根据ID删除AGV -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM agv WHERE id = #{id}
+    </delete>
+
+    <!-- 根据AGV ID更新状态 -->
+    <update id="updateByAgvId" parameterType="com.example.entity.Agv">
+        UPDATE agv
+        SET current_location = #{currentLocation},
+            status = #{status},
+            battery_level = #{batteryLevel},
+            carrying_material = #{carryingMaterial},
+            assigned_task = #{assignedTask},
+            speed = #{speed},
+            last_update_time = #{lastUpdateTime},
+            ip_address = #{ipAddress},
+            mac_address = #{macAddress},
+            is_online = #{isOnline}
+        WHERE agv_id = #{agvId}
+    </update>
+
+    <!-- 根据ID更新AGV -->
+    <update id="updateById" parameterType="com.example.entity.Agv">
+        UPDATE agv
+        SET agv_id = #{agvId},
+            current_location = #{currentLocation},
+            status = #{status},
+            battery_level = #{batteryLevel},
+            carrying_material = #{carryingMaterial},
+            assigned_task = #{assignedTask},
+            speed = #{speed},
+            last_update_time = #{lastUpdateTime},
+            ip_address = #{ipAddress},
+            mac_address = #{macAddress},
+            is_online = #{isOnline}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID查询AGV -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="AgvResultMap">
+        SELECT * FROM agv WHERE id = #{id}
+    </select>
+
+    <!-- 根据AGV ID查询 -->
+    <select id="selectByAgvId" parameterType="string" resultMap="AgvResultMap">
+        SELECT * FROM agv WHERE agv_id = #{agvId}
+    </select>
+
+    <!-- 根据条件查询所有AGV -->
+    <select id="selectAll" parameterType="com.example.entity.Agv" resultMap="AgvResultMap">
+        SELECT * FROM agv
+        <where>
+            <if test="agvId != null and agvId != ''">
+                AND agv_id = #{agvId}
+            </if>
+            <if test="currentLocation != null and currentLocation != ''">
+                AND current_location = #{currentLocation}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="batteryLevel != null">
+                AND battery_level = #{batteryLevel}
+            </if>
+            <if test="carryingMaterial != null and carryingMaterial != ''">
+                AND carrying_material = #{carryingMaterial}
+            </if>
+            <if test="assignedTask != null and assignedTask != ''">
+                AND assigned_task = #{assignedTask}
+            </if>
+            <if test="isOnline != null">
+                AND is_online = #{isOnline}
+            </if>
+        </where>
+        ORDER BY id
+    </select>
+
+</mapper>

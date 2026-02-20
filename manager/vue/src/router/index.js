@@ -25,19 +25,19 @@ const routes = [
       {
         path: 'tcp-server',
         name: 'TCPServer',
-        meta: { name: 'TCP服务器' },
-        component: () => import('../views/manager/TCPServer.vue')  // 注意：需要将 TCP_server.vue 重命名为 TCPServer.vue
+        meta: { name: 'TCP服务器', keepAlive: true },
+        component: () => import('../views/manager/TCPServer.vue')
       },
       {
         path: 'agv-monitor',
         name: 'AgvMonitor',
-        meta: { name: 'AGV监控' },
+        meta: { name: 'AGV监控', keepAlive: true },
         component: () => import('../views/manager/AgvMonitor.vue')
       },
       {
         path: 'task-scheduler',
         name: 'TaskScheduler',
-        meta: { name: '任务调度' },
+        meta: { name: '任务调度', keepAlive: true },
         component: () => import('../views/manager/TaskScheduler.vue')
       }
     ]

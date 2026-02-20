@@ -74,7 +74,10 @@
 
       <!--  数据表格  -->
       <div class="manager-main-right">
-        <router-view @update:user="updateUser" />
+        <keep-alive>
+          <router-view v-if="$route.meta.keepAlive" @update:user="updateUser" />
+        </keep-alive>
+        <router-view v-if="!$route.meta.keepAlive" @update:user="updateUser" />
       </div>
     </div>
 

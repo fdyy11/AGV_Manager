@@ -1,12 +1,10 @@
+// src/main/java/com/example/entity/Agv.java
 package com.example.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.io.Serializable;
 import java.util.Date;
 
-/**
- * AGV实体
- */
 public class Agv implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -23,8 +21,10 @@ public class Agv implements Serializable {
     private Date lastUpdateTime;     // 最后更新时间
 
     private String ipAddress;        // IP地址
+    private Integer port;            // 端口号
     private String macAddress;       // MAC地址
     private Boolean isOnline;        // 是否在线
+
 
     // getter and setter methods
     public Integer getId() { return id; }
@@ -62,4 +62,18 @@ public class Agv implements Serializable {
 
     public Boolean getIsOnline() { return isOnline; }
     public void setIsOnline(Boolean isOnline) { this.isOnline = isOnline; }
+
+    public Integer getPort() { return port; }
+    public void setPort(Integer port) { this.port = port; }
+    
+    @Override
+    public String toString() {
+        return "Agv{" +
+                "id=" + id +
+                ", agvId='" + agvId + '\'' +
+                ", status='" + status + '\'' +
+                ", ipAddress='" + ipAddress + '\'' +
+                ", port=" + port +
+                '}';
+    }
 }

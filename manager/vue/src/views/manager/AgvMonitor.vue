@@ -66,16 +66,18 @@
         <el-table-column prop="carryingMaterial" label="承载物料" width="120" />
         <el-table-column prop="speed" label="速度(m/s)" width="100" />
         <el-table-column prop="lastUpdateTime" label="最后更新" width="160" />
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="300">
           <template v-slot="scope">
             <el-button size="mini" @click="viewDetails(scope.row)">详情</el-button>
             <el-button size="mini" type="primary" @click="controlAgv(scope.row)">控制</el-button>
+            <!-- 新增连接信息按钮 -->
+            <el-button size="mini" type="info" @click="showConnectionDetail(scope.row)">连接信息</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
-
-    <!-- 地图控制面板 -->
+    <!-- AGV连接信息弹窗 -->
+    <AgvConnectionDetail :visible="connectionDialogVisible" :agv="selectedAgv" />
 
     <!-- 地图控制面板 -->
     <el-card style="margin-top: 20px;">
@@ -143,7 +145,6 @@
             />
           </g>
 
-
           <!-- 地图节点 -->
           <g v-for="node in mapNodes" :key="node.nodeId">
             <circle
@@ -210,19 +211,27 @@
         <el-button type="primary" @click="sendMoveCommand">发送移动命令</el-button>
       </div>
     </el-dialog>
+
+    <!-- 新增 AGV连接信息弹窗 -->
+    <AgvConnectionDetail :visible="connectionDialogVisible" :agv="selectedAgv" />
   </div>
 </template>
 
 <script>
-import request from '@/utils/request'
+import request from '@/utils/request';
+import AgvConnectionDetail from '@/views/manager/AgvConnectionDetail.vue'; // 绝对路径引入
+// 引入新增组件
 
 export default {
   name: 'AgvMonitor',
+  components: {
+    AgvConnectionDetail // 注册组件
+  },
   data() {
     return {
       agvs: [],
       mapNodes: [],
-      mapEdges: [], // 添加地图路径数据
+      mapEdges: [],
       stats: {
         totalAgvs: 0,
         onlineAgvs: 0,
@@ -231,10 +240,10 @@ export default {
       },
       selectedNode: null,
       controlDialogVisible: false,
-      selectedAgv: {},
+      connectionDialogVisible: false, // 新增弹窗可见性控制
+      selectedAgv: {}, // 新增选中的AGV数据
       targetLocation: '',
       websocket: null,
-      // 添加地图变换参数
       scale: 1,
       offsetX: 0,
       offsetY: 0,
@@ -243,30 +252,27 @@ export default {
       startY: 0,
       startOffsetX: 0,
       startOffsetY: 0
-    }
+    };
   },
-
   mounted() {
     this.loadAgvs();
+    setInterval(() => {
+      this.loadAgvs();
+    }, 5000); // 每5秒刷新一次
     this.loadMapNodes();
-    this.loadMapEdges(); // 加载地图路径
+    this.loadMapEdges();
     this.calculateStats();
     this.initWebSocket();
   },
-
   beforeDestroy() {
     if (this.websocket) {
       this.websocket.close();
     }
   },
-
   methods: {
-    // 获取请求头
     getHeaders() {
-      // 检查多种可能的token存储方式
       let token = localStorage.getItem('xm-token');
       if (!token) {
-        // 尝试从用户信息中获取
         const user = JSON.parse(localStorage.getItem('xm-user') || '{}');
         token = user.token || '';
       }
@@ -274,17 +280,16 @@ export default {
         'token': token
       };
     },
-
     async loadAgvs() {
       try {
         const response = await request.get('/agv/online');
         this.agvs = response.data || [];
+        console.log('AGV 数据:', this.agvs); // 打印数据检查字段
         this.calculateStats();
       } catch (error) {
         console.error('加载AGV数据失败:', error);
       }
     },
-
     async loadMapNodes() {
       try {
         const response = await request.get('/map/nodes');
@@ -293,19 +298,15 @@ export default {
         console.error('加载地图节点失败:', error);
       }
     },
-
     async loadMapEdges() {
       try {
         const response = await request.get('/map/edges');
         this.mapEdges = response.data || [];
       } catch (error) {
         console.error('加载地图路径失败:', error);
-        // 如果没有路径API，则创建简单的邻近节点连接
         this.generateEdgesFromNodes();
       }
     },
-
-    // 根据节点位置生成简单邻近连接
     generateEdgesFromNodes() {
       this.mapEdges = [];
       for (let i = 0; i < this.mapNodes.length; i++) {
@@ -316,9 +317,7 @@ export default {
               Math.pow(node1.x - node2.x, 2) +
               Math.pow(node1.y - node2.y, 2)
           );
-
-          // 如果两个节点距离较近，则认为它们之间有路径
-          if (distance < 100) { // 距离阈值可根据实际情况调整
+          if (distance < 100) {
             this.mapEdges.push({
               fromNodeId: node1.nodeId,
               toNodeId: node2.nodeId
@@ -327,18 +326,15 @@ export default {
         }
       }
     },
-
     calculateStats() {
       this.stats.totalAgvs = this.agvs.length;
       this.stats.onlineAgvs = this.agvs.filter(agv => agv.isOnline).length;
       this.stats.workingAgvs = this.agvs.filter(agv => agv.status === 'working').length;
       this.stats.lowBatteryAgvs = this.agvs.filter(agv => agv.batteryLevel < 20).length;
     },
-
     refreshAgvs() {
       this.loadAgvs();
     },
-
     getStatusType(status) {
       const types = {
         'idle': 'success',
@@ -348,59 +344,49 @@ export default {
       };
       return types[status] || 'info';
     },
-
     getBatteryColor(batteryLevel) {
-      if (batteryLevel < 20) return '#F56C6C'; // 红色
-      if (batteryLevel < 50) return '#E6A23C'; // 橙色
-      return '#67C23A'; // 绿色
+      if (batteryLevel < 20) return '#F56C6C';
+      if (batteryLevel < 50) return '#E6A23C';
+      return '#67C23A';
     },
-
     getNodeColor(nodeType) {
       const colors = {
-        'assembly': '#409EFF',    // 装配位 - 蓝色
-        'storage': '#67C23A',     // 仓库 - 绿色
-        'charging': '#E6A23C',    // 充电桩 - 橙色
-        'intersection': '#909399', // 交叉口 - 灰色
-        'other': '#909399'        // 其他 - 灰色
+        'assembly': '#409EFF',
+        'storage': '#67C23A',
+        'charging': '#E6A23C',
+        'intersection': '#909399',
+        'other': '#909399'
       };
       return colors[nodeType] || '#909399';
     },
-
     getAgvColor(status) {
       const colors = {
-        'idle': '#67C23A',      // 绿色 - 空闲
-        'working': '#409EFF',   // 蓝色 - 工作中
-        'charging': '#E6A23C',  // 橙色 - 充电
-        'fault': '#F56C6C'      // 红色 - 故障
+        'idle': '#67C23A',
+        'working': '#409EFF',
+        'charging': '#E6A23C',
+        'fault': '#F56C6C'
       };
       return colors[status] || '#909399';
     },
-
     getNodeX(locationId) {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.x : 0;
     },
-
     getNodeY(locationId) {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.y : 0;
     },
-
-    // 带变换的坐标计算
     getNodeXWithTransform(locationId) {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.x * this.scale + this.offsetX : 0;
     },
-
     getNodeYWithTransform(locationId) {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.y * this.scale + this.offsetY : 0;
     },
-
     selectNode(node) {
       this.selectedNode = node.nodeId;
     },
-
     viewDetails(agv) {
       this.$alert(`
         <div>
@@ -416,12 +402,10 @@ export default {
         dangerouslyUseHTMLString: true
       });
     },
-
     controlAgv(agv) {
       this.selectedAgv = {...agv};
       this.controlDialogVisible = true;
     },
-
     async sendMoveCommand() {
       try {
         const command = {
@@ -429,7 +413,6 @@ export default {
           targetLocation: this.targetLocation,
           command: 'MOVE'
         };
-
         await request.post('/agv/move', command);
         this.$message.success('移动命令已发送');
         this.controlDialogVisible = false;
@@ -438,19 +421,15 @@ export default {
         this.$message.error('发送命令失败: ' + (error.response?.data?.msg || error.message));
       }
     },
-
     initWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.hostname;
-      const wsUrl = `${protocol}//${host}:8080/ws/tcp-status`;
-
+      const wsUrl = `${protocol}//${host}:8080/ws/tcp-status`; // 使用 8080 端口
       try {
         this.websocket = new WebSocket(wsUrl);
-
         this.websocket.onopen = () => {
           console.log('WebSocket连接已建立');
         };
-
         this.websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -461,23 +440,20 @@ export default {
             console.error('处理WebSocket消息错误:', err);
           }
         };
-
         this.websocket.onclose = () => {
           console.log('WebSocket连接已关闭');
-          // 尝试重连
           setTimeout(() => {
             this.initWebSocket();
           }, 5000);
         };
-
         this.websocket.onerror = (error) => {
           console.error('WebSocket错误:', error);
         };
       } catch (error) {
         console.error('建立WebSocket连接失败:', error);
       }
-    },
-
+    }
+,
     updateAgvStatus(status) {
       const index = this.agvs.findIndex(agv => agv.agvId === status.agvId);
       if (index !== -1) {
@@ -487,53 +463,40 @@ export default {
       }
       this.calculateStats();
     },
-
-    // 地图缩放功能
     zoomIn() {
       this.scale *= 1.2;
     },
-
     zoomOut() {
       this.scale /= 1.2;
     },
-
     resetZoom() {
       this.scale = 1;
       this.offsetX = 0;
       this.offsetY = 0;
     },
-
     handleWheel(e) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       this.scale *= delta;
-
-      // 限制缩放范围
       this.scale = Math.max(0.1, Math.min(5, this.scale));
     },
-
     startPan(e) {
-      if (e.button !== 0) return; // 只响应左键
+      if (e.button !== 0) return;
       this.isPanning = true;
       this.startX = e.clientX - this.offsetX;
       this.startY = e.clientY - this.offsetY;
     },
-
     panning(e) {
       if (!this.isPanning) return;
       this.offsetX = e.clientX - this.startX;
       this.offsetY = e.clientY - this.startY;
     },
-
     endPan() {
       this.isPanning = false;
     },
-
-    // 地图文件上传相关方法
     beforeMapUpload(file) {
       const isDbh = file.name.endsWith('.dbh');
       const isLt50M = file.size / 1024 / 1024 < 50;
-
       if (!isDbh) {
         this.$message.error('只能上传.dbh格式的地图文件!');
       }
@@ -542,23 +505,25 @@ export default {
       }
       return isDbh && isLt50M;
     },
-
     handleMapImportSuccess(response, file, fileList) {
       if (response.code === '200') {
         this.$message.success('地图导入成功！');
-        // 重新加载地图数据
         this.loadMapNodes();
         this.loadMapEdges();
       } else {
         this.$message.error(response.msg || '地图导入失败');
       }
     },
-
     handleMapImportError(err, file, fileList) {
       this.$message.error('地图导入失败: ' + (err.message || '网络错误'));
+    },
+    // 新增方法：显示连接信息弹窗
+    showConnectionDetail(agv) {
+      this.selectedAgv = { ...agv };
+      this.connectionDialogVisible = true;
     }
   }
-}
+};
 </script>
 
 <style scoped>

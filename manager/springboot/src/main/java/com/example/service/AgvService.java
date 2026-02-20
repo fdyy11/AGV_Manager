@@ -3,8 +3,6 @@ package com.example.service;
 import cn.hutool.core.date.DateUtil;
 import com.example.entity.Agv;
 import com.example.mapper.AgvMapper;
-import com.example.service.TcpConnectionService;
-import com.example.utils.TokenUtils;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import javax.annotation.Resource;
@@ -20,14 +18,13 @@ public class AgvService {
     @Resource
     private AgvMapper agvMapper;
 
-    @Resource
-    private TcpConnectionService tcpConnectionService;
-
     /**
      * 新增AGV
      */
     public void add(Agv agv) {
         agv.setIsOnline(false);
+        agv.setIpAddress("未分配");
+        agv.setMacAddress("未分配");
         agv.setLastUpdateTime(DateUtil.date());
         agvMapper.insert(agv);
     }

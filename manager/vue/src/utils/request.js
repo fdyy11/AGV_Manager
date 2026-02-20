@@ -28,6 +28,9 @@ request.interceptors.request.use(config => {
         // 对于文件上传，上面已经设置了token
     }
 
+    // 调试日志
+    console.log('请求配置:', config);
+
     return config
 }, error => {
     console.error('request error: ' + error) // for debug

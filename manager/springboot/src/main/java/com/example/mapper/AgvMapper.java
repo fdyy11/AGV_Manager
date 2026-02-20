@@ -2,6 +2,8 @@ package com.example.mapper;
 
 import com.example.entity.Agv;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
+
 import java.util.List;
 
 /**
@@ -43,4 +45,16 @@ public interface AgvMapper {
      * 根据AGV ID查询
      */
     Agv selectByAgvId(@Param("agvId") String agvId);
+
+//    void updateByAgvId(Agv agv);
+
+//    @Update("UPDATE agv SET status = #{status} WHERE agv_id = #{agvId}")
+    void updateStatusByAgvId(@Param("agvId") String agvId, @Param("status") String status);
+
+    /**
+     * 根据 IP 和 Port 查询 AGV
+     */
+    Agv selectByIpAndPort(@Param("ip") String ip, @Param("port") int port);
+
+
 }

@@ -3,11 +3,7 @@ package com.example.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketHandler;
-import org.springframework.web.socket.WebSocketMessage;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -28,9 +24,23 @@ public class TcpStatusWebSocketHandler implements WebSocketHandler {
 
     @Override
     public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
-        String payload = (String) message.getPayload();
-        System.out.println("收到WebSocket消息 from " + session.getId() + ": " + payload);
+        if (message instanceof TextMessage) {
+            String payload = ((TextMessage) message).getPayload();
+            System.out.println("收到WebSocket文本消息 from " + session.getId() + ": " + payload);
+
+            // 解析 JSON 数据
+            try {
+                Map<String, Object> data = objectMapper.readValue(payload, Map.class);
+                // 处理业务逻辑
+            } catch (Exception e) {
+                System.err.println("解析JSON失败: " + e.getMessage());
+            }
+        } else if (message instanceof BinaryMessage) {
+            System.out.println("收到WebSocket二进制消息 from " + session.getId());
+            // 忽略二进制数据或特殊处理
+        }
     }
+
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
@@ -139,4 +149,6 @@ public class TcpStatusWebSocketHandler implements WebSocketHandler {
         }
         return list;
     }
+
+
 }

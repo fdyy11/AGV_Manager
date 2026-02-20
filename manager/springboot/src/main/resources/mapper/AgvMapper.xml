@@ -18,14 +18,17 @@
     </resultMap>
 
     <!-- 插入AGV -->
+    <!-- src/main/resources/mapper/AgvMapper.xml -->
     <insert id="insert" parameterType="com.example.entity.Agv">
         INSERT INTO agv (agv_id, current_location, status, battery_level,
                          carrying_material, assigned_task, speed,
-                         last_update_time, ip_address, mac_address, is_online)
+                         last_update_time, ip_address, mac_address, is_online, port)
         VALUES (#{agvId}, #{currentLocation}, #{status}, #{batteryLevel},
                 #{carryingMaterial}, #{assignedTask}, #{speed},
-                #{lastUpdateTime}, #{ipAddress}, #{macAddress}, #{isOnline})
+                #{lastUpdateTime}, #{ipAddress}, #{macAddress}, #{isOnline}, #{port})
     </insert>
+
+
 
     <!-- 根据ID删除AGV -->
     <delete id="deleteById" parameterType="java.lang.Integer">
@@ -48,22 +51,15 @@
         WHERE agv_id = #{agvId}
     </update>
 
-    <!-- 根据ID更新AGV -->
-    <update id="updateById" parameterType="com.example.entity.Agv">
+
+    <!-- 更新 AGV 状态 -->
+    <update id="updateStatusByAgvId" parameterType="map">
         UPDATE agv
-        SET agv_id = #{agvId},
-            current_location = #{currentLocation},
-            status = #{status},
-            battery_level = #{batteryLevel},
-            carrying_material = #{carryingMaterial},
-            assigned_task = #{assignedTask},
-            speed = #{speed},
-            last_update_time = #{lastUpdateTime},
-            ip_address = #{ipAddress},
-            mac_address = #{macAddress},
-            is_online = #{isOnline}
-        WHERE id = #{id}
+        SET status = #{status}
+        WHERE agv_id = #{agvId}
     </update>
+
+
 
     <!-- 根据ID查询AGV -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="AgvResultMap">
@@ -103,5 +99,10 @@
         </where>
         ORDER BY id
     </select>
+
+    <select id="selectByIpAndPort" parameterType="map" resultMap="AgvResultMap">
+        SELECT * FROM agv WHERE ip_address = #{ip} AND port = #{port}
+    </select>
+
 
 </mapper>

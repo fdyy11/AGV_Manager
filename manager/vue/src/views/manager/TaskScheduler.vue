@@ -256,6 +256,7 @@ export default {
       allStorageNodes: [],
       allAssemblyNodes: [],
       allMapNodes: [], // 存储所有地图节点
+      refreshInterval: null, // 定时刷新定时器
       taskRules: {
         taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
         materialType: [{ required: true, message: '请输入物料类型', trigger: 'blur' }],
@@ -269,13 +270,23 @@ export default {
   mounted() {
     this.loadTasks(1);
     this.loadAllMapNodes(); // 加载所有地图节点
-    this.loadStats();
+    // 设置定时刷新，每 3 秒更新一次任务和统计数据
+    this.refreshInterval = setInterval(() => {
+      this.loadTasks(this.pageNum);
+    }, 3000);
+  },
+  
+  beforeDestroy() {
+    // 清除定时器
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
   },
 
   methods: {
     async loadTasks(pageNum) {
       if (pageNum) this.pageNum = pageNum;
-
+    
       try {
         const response = await request.get('/task/selectPage', {
           params: {
@@ -285,12 +296,15 @@ export default {
             materialType: this.searchKeyword || undefined
           }
         });
-
+    
         this.tasks = response.data?.list || [];
         this.total = response.data?.total || 0;
+            
+        // 每次加载任务后更新统计数据
+        this.updateStats();
       } catch (error) {
         console.error('加载任务失败:', error);
-        this.$message.error('加载任务失败: ' + (error.response?.data?.msg || error.message));
+        this.$message.error('加载任务失败：' + (error.response?.data?.msg || error.message));
       }
     },
 
@@ -325,16 +339,22 @@ export default {
       return nodeId || '未设置';
     },
 
-    async loadStats() {
+    updateStats() {
       try {
-        // 这里可以通过API获取统计数据，简化为计算当前列表
-        this.stats.totalTasks = this.tasks.length;
+        // 根据当前任务列表计算统计数据
+        this.stats.totalTasks = this.total;
         this.stats.pendingTasks = this.tasks.filter(t => t.status === 'pending').length;
-        this.stats.executingTasks = this.tasks.filter(t => t.status === 'executing').length;
+        this.stats.executingTasks = this.tasks.filter(t => t.status === 'executing' || t.status === 'assigned').length;
         this.stats.completedTasks = this.tasks.filter(t => t.status === 'completed').length;
+        console.log('统计数据已更新:', this.stats);
       } catch (error) {
-        console.error('加载统计失败:', error);
+        console.error('更新统计失败:', error);
       }
+    },
+    
+    async loadStats() {
+      // 保留此方法以兼容，但现在使用 updateStats()
+      this.updateStats();
     },
 
     handleCurrentChange(pageNum) {

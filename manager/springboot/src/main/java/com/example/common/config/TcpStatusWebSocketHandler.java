@@ -4,21 +4,27 @@ package com.example.common.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
-
+import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import com.example.service.TcpClientService;
 
 @Component
 public class TcpStatusWebSocketHandler implements WebSocketHandler {
 
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    @Resource
+    private TcpClientService tcpClientService; // 注入 TcpClientService
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         sessions.put(session.getId(), session);
-        System.out.println("WebSocket连接已建立: " + session.getId() + ", sessions=" + sessions.size()
+        // 注册到 TcpClientService
+        tcpClientService.registerWebSocketSession(session);
+        System.out.println("WebSocket 连接已建立：" + session.getId() + ", sessions=" + sessions.size()
                 + ", remote=" + session.getRemoteAddress());
     }
 
@@ -53,7 +59,9 @@ public class TcpStatusWebSocketHandler implements WebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
         sessions.remove(session.getId());
-        System.out.println("WebSocket连接已关闭: " + session.getId() + ", 状态: " + closeStatus + ", sessions=" + sessions.size());
+        // 从 TcpClientService 移除
+        tcpClientService.removeWebSocketSession(session);
+        System.out.println("WebSocket 连接已关闭：" + session.getId() + ", 状态：" + closeStatus + ", sessions=" + sessions.size());
     }
 
     @Override

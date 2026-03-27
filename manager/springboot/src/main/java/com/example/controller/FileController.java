@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.util.List;
@@ -67,8 +68,23 @@ public class FileController {
         OutputStream os;
         try {
             if (StrUtil.isNotEmpty(flag)) {
-                response.addHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(flag, "UTF-8"));
-                response.setContentType("application/octet-stream");
+                // 检查文件是否存在
+                File file = new File(filePath + flag);
+                if (!file.exists()) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    return;
+                }
+                
+                // 设置正确的Content-Type
+                String contentType = getContentType(flag);
+                response.setContentType(contentType);
+                response.setContentLength((int) file.length());
+                
+                // 对于图片文件，不设置下载头，直接显示
+                if (!contentType.startsWith("image/")) {
+                    response.addHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(flag, "UTF-8"));
+                }
+                
                 byte[] bytes = FileUtil.readBytes(filePath + flag);
                 os = response.getOutputStream();
                 os.write(bytes);
@@ -76,7 +92,30 @@ public class FileController {
                 os.close();
             }
         } catch (Exception e) {
-            System.out.println("文件下载失败");
+            System.out.println("文件获取失败: " + e.getMessage());
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    /**
+     * 根据文件扩展名获取Content-Type
+     */
+    private String getContentType(String filename) {
+        if (filename == null) return "application/octet-stream";
+        
+        String lowerName = filename.toLowerCase();
+        if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+            return "image/jpeg";
+        } else if (lowerName.endsWith(".png")) {
+            return "image/png";
+        } else if (lowerName.endsWith(".gif")) {
+            return "image/gif";
+        } else if (lowerName.endsWith(".bmp")) {
+            return "image/bmp";
+        } else if (lowerName.endsWith(".webp")) {
+            return "image/webp";
+        } else {
+            return "application/octet-stream";
         }
     }
 

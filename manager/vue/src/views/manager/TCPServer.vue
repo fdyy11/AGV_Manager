@@ -142,14 +142,24 @@ export default {
     },
     async connectToAgv(agv) {
       try {
-        const response = await request.post('/tcp-client/connect', {
+        // 确保使用配置的端口号，而不是默认的5555
+        const portToUse = agv.port || 5555;
+        console.log(`准备连接AGV: IP=${agv.ip}, 配置端口=${agv.port}, 实际使用端口=${portToUse}`);
+        
+        // 使用查询参数而不是请求体来传递参数
+        const requestData = {
           agvId: agv.agvId || undefined,
           ip: agv.ip || '127.0.0.1',
-          port: agv.port || 5555
+          port: portToUse
+        };
+        console.log('发送连接请求，参数:', requestData);
+        
+        const response = await request.post('/tcp-client/connect', null, {
+          params: requestData
         });
 
         if (response.code === '200') {
-          this.$message.success(`成功连接到 AGV ${agv.ip}:${agv.port}`);
+          this.$message.success(`成功连接到 AGV ${agv.ip}:${portToUse}`);
           
           // 更新配置列表中的状态
           agv.status = 'connected';
@@ -162,9 +172,7 @@ export default {
       } catch (error) {
         this.$message.error('连接失败: ' + (error.response?.data?.msg || error.message));
       }
-    }
-
-,
+    },
     async loadAllAgvs() {
       try {
         const response = await request.get('/tcp-client/all-agvs');
@@ -189,6 +197,9 @@ export default {
       this.loading = true;
       try {
         console.log('=== 开始加载AGV数据 ===');
+        
+        // 先执行批量连接状态检查
+        await this.checkAllConnections();
         
         // 先获取所有AGV
         const allAgvsResponse = await request.get('/tcp-client/all-agvs');
@@ -237,8 +248,7 @@ export default {
       } finally {
         this.loading = false;
       }
-    }
-,
+    },
 
     async sendTestCommand(agv) {
       try {
@@ -327,8 +337,7 @@ export default {
         
         this.$message.error(errorMsg);
       }
-    }
-,
+    },
     getAgvStatusType(status) {
       const types = {
         connected: 'success',
@@ -362,6 +371,54 @@ export default {
     },
     disconnectAgv(agv) {
       this.disconnectFromAgv(agv)
+    },
+    
+    // 新增：批量检查所有连接状态
+    async checkAllConnections() {
+      try {
+        console.log('执行批量连接状态检查...');
+        const response = await request.get('/tcp-client/check-all-connections');
+        if (response.code === '200') {
+          console.log('批量检查结果:', response.data);
+          // 可以在这里处理检查结果，比如显示通知
+          const disconnectedCount = response.data.filter(item => !item.connected).length;
+          if (disconnectedCount > 0) {
+            console.log(`${disconnectedCount} 个AGV连接已断开`);
+            // 可选：显示通知
+            // this.$message.warning(`${disconnectedCount} 个AGV连接已断开`);
+          }
+        }
+      } catch (error) {
+        console.warn('批量检查连接状态失败:', error);
+      }
+    },
+    
+    // 新增：检查单个AGV连接状态
+    async checkAgvConnection(agvId) {
+      try {
+        const response = await request.get(`/tcp-client/check-connection/${agvId}`);
+        if (response.code === '200') {
+          console.log(`AGV ${agvId} 连接状态:`, response.data);
+          return response.data;
+        }
+      } catch (error) {
+        console.warn(`检查AGV ${agvId} 连接状态失败:`, error);
+      }
+      return null;
+    },
+    
+    // 新增：获取连接统计信息
+    async getConnectionStats() {
+      try {
+        const response = await request.get('/tcp-client/connection-stats');
+        if (response.code === '200') {
+          console.log('连接统计信息:', response.data);
+          return response.data;
+        }
+      } catch (error) {
+        console.warn('获取连接统计信息失败:', error);
+      }
+      return null;
     },
     
     // 专门处理配置区域的断开连接
@@ -430,6 +487,7 @@ export default {
         clearInterval(this.refreshInterval);
       }
     },
+    
     async deleteAgv(agv) {
       try {
         // 先确认是否真的要删除

@@ -43,7 +43,7 @@
             <template slot="title">
               <i class="el-icon-menu"></i><span>通信管理</span>
             </template>
-            <el-menu-item index="/tcp-server">TCP服务器</el-menu-item>
+            <el-menu-item index="/tcp-server">AGV连接</el-menu-item>
           </el-submenu>
 
           <el-submenu index="info">
@@ -65,7 +65,9 @@
             <template slot="title">
               <i class="el-icon-menu"></i><span>物流管理</span>
             </template>
-            <el-menu-item index="/agv-monitor">AGV监控</el-menu-item>
+            <el-menu-item index="/agv-monitor">AGV 监控</el-menu-item>
+            <el-menu-item index="/agv-control-panel">AGV 控制面板</el-menu-item>
+            <el-menu-item index="/route-scheduler">路线调度</el-menu-item>
             <el-menu-item index="/task-scheduler">任务调度</el-menu-item>
           </el-submenu>
 

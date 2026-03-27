@@ -6,6 +6,7 @@ import com.example.common.Result;
 import com.example.entity.Agv;
 import com.example.mapper.AgvMapper; // 确保导入正确的 Mapper 类
 import com.example.service.TcpClientService;
+import com.example.service.AgvApiService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -23,6 +24,9 @@ public class TcpClientController {
 
     @Resource
     private AgvMapper agvMapper; // 添加 AgvMapper 的依赖注入
+    
+    @Resource
+    private AgvApiService agvApiService; // 注入 AgvApiService
 
     /**
      * 连接到指定的AGV服务端
@@ -30,9 +34,14 @@ public class TcpClientController {
     @PostMapping("/connect")
     public Result connectToAgv(@RequestParam(required = false) String agvId,
                                @RequestParam(defaultValue = "127.0.0.1") String ip,
-                               @RequestParam(defaultValue = "5555") int port) {
+                               @RequestParam int port) {  // 移除了默认端口，要求必须提供
 
-        System.out.println("接收到的连接参数 - IP: " + ip + ", Port: " + port);
+        System.out.println("=== 接收到AGV连接请求 ===");
+        System.out.println("参数详情:");
+        System.out.println("- agvId: " + agvId);
+        System.out.println("- ip: " + ip);
+        System.out.println("- port: " + port);
+        System.out.println("========================");
         try {
             // 查询是否已存在相同 IP 和 Port 的 AGV 记录
             Agv existingAgv = agvMapper.selectByIpAndPort(ip, port);
@@ -278,6 +287,204 @@ public class TcpClientController {
             System.err.println("测试更新状态失败: " + e.getMessage());
             e.printStackTrace();
             return Result.error("500", "更新失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 检查AGV连接状态
+     */
+    @GetMapping("/check-connection/{agvId}")
+    public Result checkAgvConnection(@PathVariable String agvId) {
+        try {
+            boolean isConnected = tcpClientService.isAgvConnected(agvId);
+            String status = isConnected ? "connected" : "disconnected";
+            
+            // 更新数据库状态
+            agvMapper.updateStatusByAgvId(agvId, status);
+            
+            return Result.success(Map.of(
+                "agvId", agvId,
+                "connected", isConnected,
+                "status", status
+            ));
+        } catch (Exception e) {
+            System.err.println("检查AGV连接状态失败: " + e.getMessage());
+            return Result.error("500", "检查失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 批量检查所有AGV连接状态
+     */
+    @GetMapping("/check-all-connections")
+    public Result checkAllConnections() {
+        try {
+            List<Agv> allAgvs = agvMapper.selectAll(null);
+            List<Map<String, Object>> connectionStatus = new java.util.ArrayList<>();
+            
+            for (Agv agv : allAgvs) {
+                boolean isConnected = tcpClientService.isAgvConnected(agv.getAgvId());
+                String status = isConnected ? "connected" : "disconnected";
+                
+                // 更新数据库状态
+                agvMapper.updateStatusByAgvId(agv.getAgvId(), status);
+                
+                connectionStatus.add(Map.of(
+                    "agvId", agv.getAgvId(),
+                    "ipAddress", agv.getIpAddress(),
+                    "port", agv.getPort(),
+                    "connected", isConnected,
+                    "status", status
+                ));
+            }
+            
+            return Result.success(connectionStatus);
+        } catch (Exception e) {
+            System.err.println("批量检查连接状态失败: " + e.getMessage());
+            return Result.error("500", "检查失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取连接统计信息
+     */
+    @GetMapping("/connection-stats")
+    public Result getConnectionStats() {
+        try {
+            String stats = tcpClientService.getConnectionStats();
+            return Result.success(stats);
+        } catch (Exception e) {
+            System.err.println("获取连接统计信息失败：" + e.getMessage());
+            return Result.error("500", "获取失败：" + e.getMessage());
+        }
+    }
+    
+    // ==================== AGV API 控制接口 ====================
+    
+    /**
+     * 发送移动命令到指定坐标
+     */
+    @PostMapping("/api/move-to-coord")
+    public Result moveToCoordinate(@RequestParam String agvId,
+                                   @RequestParam double x,
+                                   @RequestParam double y,
+                                   @RequestParam(defaultValue = "0") double theta) {
+        try {
+            Map<String, Object> result = agvApiService.sendMoveCommand(agvId, x, y, theta);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送移动命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 发送移动命令到标记点
+     */
+    @PostMapping("/api/move-to-marker")
+    public Result moveToMarker(@RequestParam String agvId,
+                               @RequestParam String marker,
+                               @RequestParam(required = false) String uuid) {
+        try {
+            if (uuid == null || uuid.isEmpty()) {
+                uuid = java.util.UUID.randomUUID().toString();
+            }
+            Map<String, Object> result = agvApiService.sendMoveToMarkerCommand(agvId, marker, uuid);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送移动命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 查询机器人状态
+     */
+    @PostMapping("/api/robot-status")
+    public Result getRobotStatus(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendRobotStatusCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送状态查询命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 紧急停止
+     */
+    @PostMapping("/api/emergency-stop")
+    public Result emergencyStop(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendEmergencyStopCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送紧急停止命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 复位命令
+     */
+    @PostMapping("/api/reset")
+    public Result reset(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendResetCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送复位命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 充电命令
+     */
+    @PostMapping("/api/charge")
+    public Result charge(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendChargeCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送充电命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 取消当前任务
+     */
+    @PostMapping("/api/cancel-task")
+    public Result cancelTask(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendCancelTaskCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送取消任务命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取位置信息
+     */
+    @PostMapping("/api/get-position")
+    public Result getPosition(@RequestParam String agvId) {
+        try {
+            Map<String, Object> result = agvApiService.sendGetPositionCommand(agvId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送获取位置命令失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 发送自定义 API 命令
+     */
+    @PostMapping("/api/custom")
+    public Result customCommand(@RequestParam String agvId,
+                                @RequestParam String apiPath,
+                                @RequestParam(required = false) Map<String, String> params) {
+        try {
+            Map<String, Object> result = agvApiService.sendCustomCommand(agvId, apiPath, params);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("201", "发送自定义命令失败：" + e.getMessage());
         }
     }
 

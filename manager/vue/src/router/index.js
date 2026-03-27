@@ -31,8 +31,20 @@ const routes = [
       {
         path: 'agv-monitor',
         name: 'AgvMonitor',
-        meta: { name: 'AGV监控', keepAlive: true },
+        meta: { name: 'AGV 监控', keepAlive: true },
         component: () => import('../views/manager/AgvMonitor.vue')
+      },
+      {
+        path: 'agv-control-panel',
+        name: 'AgvControlPanel',
+        meta: { name: 'AGV 控制面板', keepAlive: true },
+        component: () => import('../views/manager/AgvControlPanel.vue')
+      },
+      {
+        path: 'route-scheduler',
+        name: 'RouteScheduler',
+        meta: { name: '路线调度', keepAlive: true },
+        component: () => import('../views/manager/RouteScheduler.vue')
       },
       {
         path: 'task-scheduler',

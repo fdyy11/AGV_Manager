@@ -38,6 +38,11 @@ public class JwtInterceptor implements HandlerInterceptor {
         String uri = request.getRequestURI();
         System.out.println("Intercepting request: " + uri);
 
+        // 排除文件访问路径
+        if (uri.startsWith("/files/")) {
+            return true; // 直接放行文件访问
+        }
+
         // 从header或参数获取token
         String token = request.getHeader(Constants.TOKEN);
         if (ObjectUtil.isEmpty(token)) {

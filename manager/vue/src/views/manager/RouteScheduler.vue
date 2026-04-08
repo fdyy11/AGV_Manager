@@ -100,24 +100,75 @@
           </g>
 
           <!-- AGV 位置 -->
-          <g v-for="agv in agvs.filter(a => a.isOnline)" :key="agv.agvId">
+          <g v-for="agv in agvs" :key="'agv-' + agv.agvId">
+            <!-- AGV 机器人图标（用带方向的圆表示） -->
             <circle
-                :cx="getNodeXWithTransform(agv.currentLocation)"
-                :cy="getNodeYWithTransform(agv.currentLocation)"
-                r="15"
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null"
+                :cx="getAgvX(agv)"
+                :cy="getAgvY(agv)"
+                r="18"
                 :fill="getAgvColor(agv.status)"
-                stroke="black"
+                stroke="#333"
                 stroke-width="2"
+                style="filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));"
             >
-              <title>{{ agv.agvId }} - {{ agv.status }}</title>
+              <title>{{ agv.agvId }} - {{ agv.status }}\n坐标：({{ agv.currentX?.toFixed(2) || 'N/A' }}, {{ agv.currentY?.toFixed(2) || 'N/A' }})\n电量：{{ agv.batteryLevel || 'N/A' }}%</title>
             </circle>
+            <!-- AGV 方向指示器 -->
+            <line
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null && agv.currentTheta"
+                :x1="getAgvX(agv)"
+                :y1="getAgvY(agv)"
+                :x2="getAgvX(agv) + Math.cos(agv.currentTheta) * 25"
+                :y2="getAgvY(agv) + Math.sin(agv.currentTheta) * 25"
+                stroke="white"
+                stroke-width="3"
+                stroke-linecap="round"
+            />
+            <!-- AGV 编号 -->
             <text
-                :x="getNodeXWithTransform(agv.currentLocation)"
-                :y="getNodeYWithTransform(agv.currentLocation) - 20"
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null"
+                :x="getAgvX(agv)"
+                :y="getAgvY(agv) - 25"
+                text-anchor="middle"
+                font-size="12"
+                fill="white"
+                font-weight="bold"
+                style="text-shadow: 1px 1px 2px black;"
+            >{{ agv.agvId }}</text>
+            <!-- 显示坐标信息 -->
+            <text
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null"
+                :x="getAgvX(agv)"
+                :y="getAgvY(agv) + 45"
                 text-anchor="middle"
                 font-size="10"
-                fill="white"
-            >{{ agv.agvId }}</text>
+                fill="#333"
+                font-weight="bold"
+            >({{ agv.currentX.toFixed(2) }}, {{ agv.currentY.toFixed(2) }})</text>
+            <!-- 电量显示 -->
+            <rect
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null && agv.batteryLevel !== null && agv.batteryLevel !== undefined"
+                :x="getAgvX(agv) - 20"
+                :y="getAgvY(agv) + 25"
+                width="40"
+                height="6"
+                rx="3"
+                ry="3"
+                fill="#ddd"
+                stroke="#999"
+                stroke-width="1"
+            />
+            <rect
+                v-if="agv.isOnline && agv.currentX != null && agv.currentY != null && agv.batteryLevel !== null && agv.batteryLevel !== undefined"
+                :x="getAgvX(agv) - 19"
+                :y="getAgvY(agv) + 26"
+                :width="38 * (agv.batteryLevel / 100)"
+                height="4"
+                rx="2"
+                ry="2"
+                :fill="agv.batteryLevel > 50 ? '#67C23A' : (agv.batteryLevel > 20 ? '#E6A23C' : '#F56C6C')"
+            />
           </g>
         </svg>
       </div>
@@ -199,6 +250,31 @@ export default {
     this.loadMapNodes();
     this.loadMapEdges();
     this.initWebSocket();
+    
+    // 添加地图渲染完成的提示
+    this.$nextTick(() => {
+      console.log('🗺️ 地图已渲染完成');
+      console.log(`当前 AGV 总数：${this.agvs.length}`);
+      const onlineWithCoords = this.agvs.filter(a => a.isOnline && a.currentX != null && a.currentY != null);
+      console.log(`在线且有坐标的 AGV: ${onlineWithCoords.length}`);
+      if (onlineWithCoords.length > 0) {
+        console.log('应该在地图上显示的 AGV:', onlineWithCoords.map(a => ({
+          id: a.agvId,
+          x: a.currentX,
+          y: a.currentY,
+          mapX: this.getAgvX(a),
+          mapY: this.getAgvY(a),
+          status: a.status
+        })));
+      }
+      
+      // 检查 SVG 元素
+      const svgCircles = document.querySelectorAll('circle');
+      console.log(`🔵 地图上绘制的圆形数量：${svgCircles.length}`);
+      svgCircles.forEach((circle, index) => {
+        console.log(`圆形 ${index}: cx=${circle.getAttribute('cx')}, cy=${circle.getAttribute('cy')}, r=${circle.getAttribute('r')}`);
+      });
+    });
   },
   beforeDestroy() {
     if (this.websocket) {
@@ -218,10 +294,29 @@ export default {
     },
     async loadAgvs() {
       try {
-        // 从数据库加载所有AGV（包括已连接和未连接的）
+        // 从数据库加载所有 AGV（包括已连接和未连接的）
         const response = await request.get('/tcp-client/all-agvs');
         this.agvs = response.data || [];
-        console.log('从数据库加载的 AGV 数据:', this.agvs);
+        console.log('📋 从数据库加载的 AGV 数据:', this.agvs);
+            
+        // 检查是否有在线的 AGV
+        const onlineAgvs = this.agvs.filter(a => a.isOnline);
+        console.log(`🟢 在线 AGV 数量：${onlineAgvs.length}`);
+            
+        if (onlineAgvs.length > 0) {
+          console.log('✅ 有 AGV 在地图上应该显示');
+          onlineAgvs.forEach(agv => {
+            const mapX = this.getAgvX(agv);
+            const mapY = this.getAgvY(agv);
+            console.log(`  - ${agv.agvId}: X=${agv.currentX}, Y=${agv.currentY}, isOnline=${agv.isOnline}`);
+            console.log(`    → 地图像素坐标：getAgvX=${mapX.toFixed(2)}, getAgvY=${mapY.toFixed(2)}`);
+            console.log(`    → viewBox 范围：0 0 ${this.isSizeLocked ? '640 480' : '1200 800'}`);
+            console.log(`    → 是否在 viewBox 内：${mapX >= 0 && mapX <= (this.isSizeLocked ? 640 : 1200) && mapY >= 0 && mapY <= (this.isSizeLocked ? 480 : 800) ? '✅ 是' : '❌ 否'}`);
+            console.log(`    → 电量：${agv.batteryLevel !== null && agv.batteryLevel !== undefined ? agv.batteryLevel + '%' : 'N/A'}`);
+          });
+        } else {
+          console.warn('⚠️ 没有在线的 AGV，请检查连接状态');
+        }
       } catch (error) {
         console.error('加载 AGV 数据失败:', error);
       }
@@ -324,6 +419,50 @@ export default {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.y : 0;
     },
+    
+    /**
+     * 获取 AGV 的 X 坐标（优先使用实时坐标，否则使用节点位置）
+     */
+    getAgvX(agv) {
+      // 如果有当前位置（节点 ID），使用节点位置
+      if (agv.currentLocation) {
+        const node = this.mapNodes.find(n => n.nodeId === agv.currentLocation);
+        if (node) {
+          return node.x * this.scale + this.offsetX;
+        }
+      }
+      
+      // 使用 AGV 的实时坐标
+      // 注意：假设 AGV API 返回的 currentX/currentY 与地图节点使用相同的坐标系和單位
+      // 如果地图节点单位是 cm，则 AGV 的 currentX=50 表示 50cm
+      if (agv.currentX !== null && agv.currentX !== undefined) {
+        return agv.currentX * this.scale + this.offsetX;
+      }
+      
+      return 0;
+    },
+    
+    /**
+     * 获取 AGV 的 Y 坐标（优先使用实时坐标，否则使用节点位置）
+     */
+    getAgvY(agv) {
+      // 如果有当前位置（节点 ID），使用节点位置
+      if (agv.currentLocation) {
+        const node = this.mapNodes.find(n => n.nodeId === agv.currentLocation);
+        if (node) {
+          return node.y * this.scale + this.offsetY;
+        }
+      }
+      
+      // 使用 AGV 的实时坐标
+      // 注意：假设 AGV API 返回的 currentX/currentY 与地图节点使用相同的坐标系和單位
+      // 如果地图节点单位是 cm，则 AGV 的 currentY=50 表示 50cm
+      if (agv.currentY !== null && agv.currentY !== undefined) {
+        return agv.currentY * this.scale + this.offsetY;
+      }
+      
+      return 0;
+    },
     getNodeXWithTransform(locationId) {
       const node = this.mapNodes.find(n => n.nodeId === locationId);
       return node ? node.x * this.scale + this.offsetX : 0;
@@ -357,7 +496,7 @@ export default {
     initWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.hostname;
-      const wsUrl = `${protocol}//${host}:8080/ws/tcp-status`; // 使用 8080 端口
+      const wsUrl = `${protocol}//${host}:9090/ws/tcp-status`; // ✅ 使用 9090 端口
       try {
         this.websocket = new WebSocket(wsUrl);
         this.websocket.onopen = () => {
@@ -366,8 +505,13 @@ export default {
         this.websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('收到 WebSocket 消息:', data);
+            
             if (data.type === 'agvStatus') {
               this.updateAgvStatus(data.payload);
+            } else if (data.type === 'agvPosition' || data.agvId) {
+              // 处理 AGV 位置更新
+              this.updateAgvPosition(data);
             }
           } catch (err) {
             console.error('处理 WebSocket 消息错误:', err);
@@ -392,6 +536,29 @@ export default {
         this.$set(this.agvs, index, { ...this.agvs[index], ...status });
       } else {
         this.agvs.push(status);
+      }
+    },
+    
+    /**
+     * 更新 AGV 位置信息
+     */
+    updateAgvPosition(positionData) {
+      const agvId = positionData.agvId;
+      const index = this.agvs.findIndex(agv => agv.agvId === agvId);
+      
+      if (index !== -1) {
+        // 更新现有 AGV 的坐标信息
+        const updatedAgv = {
+          ...this.agvs[index],
+          currentX: positionData.positionX || positionData.currentX,
+          currentY: positionData.positionY || positionData.currentY,
+          currentTheta: positionData.theta || positionData.currentTheta,
+          status: positionData.status || this.agvs[index].status
+        };
+        this.$set(this.agvs, index, updatedAgv);
+        console.log(`🗺️ 更新 AGV ${agvId} 在地图上的位置：X=${updatedAgv.currentX}, Y=${updatedAgv.currentY}`);
+      } else {
+        console.log('未找到 AGV:', agvId);
       }
     },
     toggleSizeLock() {

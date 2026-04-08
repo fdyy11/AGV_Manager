@@ -443,34 +443,19 @@ export default {
       }
     },
     async mounted() {
-      console.log('=== TCPServer组件挂载 ===');
+      console.log('=== TCPServer 组件挂载 ===');
       try {
         // 立即加载数据
         await this.loadConnectedAgvs();
         console.log('初始数据加载完成');
       } catch (error) {
         console.error('初始数据加载失败:', error);
-        // 即使失败也设置定时器
       }
-      
-      // 设置定时刷新已连接AGV列表
-      this.refreshInterval = setInterval(() => {
-        this.loadConnectedAgvs();
-      }, 3000); // 每3秒刷新一次
-      console.log('定时器已设置');
     },
     
     activated() {
-      // 当组件被激活时重新开始定时刷新
-      if (!this.refreshInterval) {
-        this.loadConnectedAgvs();
-        this.refreshInterval = setInterval(() => {
-          this.loadConnectedAgvs();
-        }, 3000);
-      } else {
-        // 如果定时器已存在，立即刷新一次数据
-        this.loadConnectedAgvs();
-      }
+      // 当组件被激活时重新加载数据
+      this.loadConnectedAgvs();
     },
     
     deactivated() {

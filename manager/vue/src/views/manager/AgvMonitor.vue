@@ -103,7 +103,7 @@
     </el-dialog>
     
     <!-- 新增 AGV 连接信息弹窗 -->
-    <AgvConnectionDetail :visible="connectionDialogVisible" :agv="selectedAgv" />
+    <AgvConnectionDetail :visible.sync="connectionDialogVisible" :agv="selectedAgv" />
   </div>
 </template>
 
@@ -131,21 +131,22 @@ export default {
       connectionDialogVisible: false, // 新增弹窗可见性控制
       selectedAgv: {}, // 新增选中的 AGV 数据
       targetLocation: '',
-      websocket: null
+      websocket: null,
+      refreshInterval: null // 定时刷新定时器
     };
   },
   mounted() {
     this.loadAgvs();
     this.loadMapNodes(); // 加载地图节点用于 AGV 控制
-    setInterval(() => {
-      this.loadAgvs();
-    }, 5000); // 每 5 秒刷新一次
     this.calculateStats();
     this.initWebSocket();
   },
   beforeDestroy() {
     if (this.websocket) {
       this.websocket.close();
+    }
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
     }
   },
   methods: {
@@ -256,43 +257,118 @@ export default {
     initWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.hostname;
-      const wsUrl = `${protocol}//${host}:8080/ws/tcp-status`; // 使用 8080 端口
+      const wsUrl = `${protocol}//${host}:9090/ws/tcp-status`; // ✅ 使用 9090 端口（与后端一致）
+          
+      console.log('尝试连接 WebSocket:', wsUrl);
+      console.log('当前主机:', host);
+      console.log('协议:', protocol);
+          
       try {
         this.websocket = new WebSocket(wsUrl);
         this.websocket.onopen = () => {
-          console.log('WebSocket连接已建立');
+          console.log('✅ WebSocket 连接已建立:', wsUrl);
         };
         this.websocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('📨 收到 WebSocket 消息:', data);
+            console.log('消息类型:', data.type);
+            console.log('消息内容:', data.payload || data);
+                            
             if (data.type === 'agvStatus') {
+              // 处理 AGV 状态更新
+              console.log('→ 处理 AGV 状态更新');
               this.updateAgvStatus(data.payload);
+              console.log('已更新 AGV 状态:', data.payload.agvId);
+            } else if (data.type === 'agvPosition' || data.payload?.currentX || data.payload?.positionX) {
+              // 处理 AGV 位置更新
+              console.log('→ 处理 AGV 位置更新');
+              this.updateAgvPosition(data.payload);
+              console.log('已更新 AGV 位置:', data.payload.agvId);
+            } else if (data.type === 'textMessage') {
+              // 处理文本消息
+              console.log('→ 处理文本消息');
+              console.log('收到文本消息:', data.message);
+              this.$message.info(`AGV ${data.agvId}: ${data.message}`);
+            } else {
+              console.warn('⚠️ 未知的消息类型:', data.type);
             }
           } catch (err) {
-            console.error('处理WebSocket消息错误:', err);
+            console.error('❌ 处理 WebSocket 消息错误:', err);
+            console.error('原始消息:', event.data);
           }
         };
         this.websocket.onclose = () => {
-          console.log('WebSocket连接已关闭');
+          console.log('⚠️ WebSocket 连接已关闭');
           setTimeout(() => {
             this.initWebSocket();
           }, 5000);
         };
         this.websocket.onerror = (error) => {
-          console.error('WebSocket错误:', error);
+          console.error('❌ WebSocket 错误:', error);
+          console.error('WebSocket 连接失败，请检查：');
+          console.error('1. 后端服务是否启动在 8080 端口');
+          console.error('2. WebSocket 路径是否正确：/ws/tcp-status');
+          console.error('3. 防火墙是否阻止连接');
         };
       } catch (error) {
-        console.error('建立WebSocket连接失败:', error);
+        console.error('建立 WebSocket 连接失败:', error);
       }
     },
     updateAgvStatus(status) {
       const index = this.agvs.findIndex(agv => agv.agvId === status.agvId);
       if (index !== -1) {
-        this.$set(this.agvs, index, { ...this.agvs[index], ...status });
+        // 合并所有 AGV 状态字段
+        const updatedAgv = {
+          ...this.agvs[index],
+          // 基本字段
+          status: status.status || this.agvs[index].status,
+          batteryLevel: status.power_percent || status.batteryLevel || this.agvs[index].batteryLevel,
+          currentLocation: status.move_target || this.agvs[index].currentLocation,
+          speed: status.speed || this.agvs[index].speed,
+          carryingMaterial: status.carryingMaterial || this.agvs[index].carryingMaterial,
+          lastUpdateTime: new Date().toLocaleString(),
+          // AGV API 返回的新字段
+          moveTarget: status.move_target,           // 目标点位
+          moveStatus: status.move_status,           // 移动状态
+          runningStatus: status.running_status,     // 运行状态
+          moveRetryTimes: status.move_retry_times,  // 重试次数
+          chargeState: status.charge_state,         // 充电状态
+          softEstopState: status.soft_estop_state,  // 软急停
+          hardEstopState: status.hard_estop_state,  // 硬急停
+          estopState: status.estop_state,           // 急停状态
+          currentFloor: status.current_floor,       // 当前楼层
+          chargepileId: status.chargepile_id,       // 充电桩 ID
+          errorCode: status.error_code,             // 错误码
+          // 坐标信息
+          currentX: status.positionX || status.x,
+          currentY: status.positionY || status.y,
+          currentTheta: status.theta || status.theta
+        };
+        this.$set(this.agvs, index, updatedAgv);
+        console.log('已更新 AGV 状态:', updatedAgv);
       } else {
-        this.agvs.push(status);
+        console.log('未找到 AGV:', status.agvId);
       }
       this.calculateStats();
+    },
+    updateAgvPosition(positionData) {
+      const agvId = positionData.agvId;
+      const index = this.agvs.findIndex(agv => agv.agvId === agvId);
+      
+      if (index !== -1) {
+        // 更新现有 AGV 的坐标信息
+        const updatedAgv = {
+          ...this.agvs[index],
+          currentX: positionData.positionX || positionData.currentX,
+          currentY: positionData.positionY || positionData.currentY,
+          currentTheta: positionData.theta || positionData.currentTheta
+        };
+        this.$set(this.agvs, index, updatedAgv);
+        console.log(`更新 AGV ${agvId} 位置：X=${updatedAgv.currentX}, Y=${updatedAgv.currentY}`);
+      } else {
+        console.log('未找到 AGV:', agvId);
+      }
     },
     // 新增方法：显示连接信息弹窗
     showConnectionDetail(agv) {

@@ -15,17 +15,23 @@
         <result property="ipAddress" column="ip_address"/>
         <result property="macAddress" column="mac_address"/>
         <result property="isOnline" column="is_online"/>
+        <result property="port" column="port"/>
+        <result property="currentX" column="current_x"/>
+        <result property="currentY" column="current_y"/>
+        <result property="currentTheta" column="current_theta"/>
     </resultMap>
 
-    <!-- 插入AGV -->
+    <!-- 插入 AGV -->
     <!-- src/main/resources/mapper/AgvMapper.xml -->
     <insert id="insert" parameterType="com.example.entity.Agv">
         INSERT INTO agv (agv_id, current_location, status, battery_level,
                          carrying_material, assigned_task, speed,
-                         last_update_time, ip_address, mac_address, is_online, port)
+                         last_update_time, ip_address, mac_address, is_online, port,
+                         current_x, current_y, current_theta)
         VALUES (#{agvId}, #{currentLocation}, #{status}, #{batteryLevel},
                 #{carryingMaterial}, #{assignedTask}, #{speed},
-                #{lastUpdateTime}, #{ipAddress}, #{macAddress}, #{isOnline}, #{port})
+                #{lastUpdateTime}, #{ipAddress}, #{macAddress}, #{isOnline}, #{port},
+                #{currentX}, #{currentY}, #{currentTheta})
     </insert>
 
 
@@ -47,7 +53,10 @@
             last_update_time = #{lastUpdateTime},
             ip_address = #{ipAddress},
             mac_address = #{macAddress},
-            is_online = #{isOnline}
+            is_online = #{isOnline},
+            current_x = #{currentX},
+            current_y = #{currentY},
+            current_theta = #{currentTheta}
         WHERE agv_id = #{agvId}
     </update>
 

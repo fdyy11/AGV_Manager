@@ -92,4 +92,37 @@ INSERT INTO `map_edge` VALUES (3, 'N001', 'N004', 111.8, 'normal');
 INSERT INTO `map_edge` VALUES (4, 'N002', 'N005', 111.8, 'normal');
 INSERT INTO `map_edge` VALUES (5, 'N004', 'N005', 100.0, 'normal');
 
+-- ----------------------------
+-- Table structure for agv
+-- ----------------------------
+DROP TABLE IF EXISTS `agv`;
+CREATE TABLE `agv`  (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `agv_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'AGV 编号',
+  `current_location` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '当前位置（节点 ID）',
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '状态（idle, working, charging, fault）',
+  `battery_level` int(11) NULL DEFAULT NULL COMMENT '电量百分比',
+  `carrying_material` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '承载物料',
+  `assigned_task` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '当前任务',
+  `speed` double NULL DEFAULT NULL COMMENT '当前速度',
+  `last_update_time` datetime NULL DEFAULT NULL COMMENT '最后更新时间',
+  `ip_address` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'IP 地址',
+  `port` int(11) NULL DEFAULT NULL COMMENT '端口号',
+  `mac_address` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'MAC 地址',
+  `is_online` tinyint(1) NULL DEFAULT 0 COMMENT '是否在线',
+  `current_x` double NULL DEFAULT NULL COMMENT '当前 X 坐标（单位：m，从 AGV API 获取的实时坐标）',
+  `current_y` double NULL DEFAULT NULL COMMENT '当前 Y 坐标（单位：m，从 AGV API 获取的实时坐标）',
+  `current_theta` double NULL DEFAULT NULL COMMENT '当前角度（单位：rad，从 AGV API 获取的实时坐标）',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `idx_agv_id`(`agv_id`) USING BTREE,
+  INDEX `idx_status`(`status`) USING BTREE,
+  INDEX `idx_is_online`(`is_online`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AGV 信息表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of agv (示例数据，实际使用时删除)
+-- ----------------------------
+INSERT INTO `agv` VALUES (1, 'AGV_001', 'N001', 'idle', 95, NULL, NULL, 1.0, NOW(), '127.0.0.1', 5555, NULL, 1, 50.0, 50.0, 0.5);
+INSERT INTO `agv` VALUES (2, 'AGV_002', 'N002', 'working', 80, '物料 A', 'TASK_001', 1.2, NOW(), '127.0.0.1', 5556, NULL, 1, 200.0, 100.0, 0.0);
+
 SET FOREIGN_KEY_CHECKS = 1;

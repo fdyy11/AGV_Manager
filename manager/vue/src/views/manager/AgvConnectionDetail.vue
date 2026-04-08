@@ -1,9 +1,9 @@
 <template>
-  <el-dialog title="AGV 连接详情" :visible.sync="visible" width="50%">
+  <el-dialog title="AGV 连接详情" :visible="visible" @close="handleClose" width="50%">
     <el-descriptions :column="1" border>
-      <el-descriptions-item label="AGV编号">{{ agv.agvId }}</el-descriptions-item>
-      <el-descriptions-item label="IP地址">{{ agv.ipAddress }}</el-descriptions-item>
-      <el-descriptions-item label="MAC地址">{{ agv.macAddress }}</el-descriptions-item>
+      <el-descriptions-item label="AGV 编号">{{ agv.agvId }}</el-descriptions-item>
+      <el-descriptions-item label="IP 地址">{{ agv.ipAddress }}</el-descriptions-item>
+      <el-descriptions-item label="MAC 地址">{{ agv.macAddress }}</el-descriptions-item>
       <el-descriptions-item label="连接状态">
         <el-tag :type="getConnectionStatusType(agv.isOnline)">
           {{ getConnectionStatusText(agv.isOnline) }}
@@ -15,7 +15,7 @@
     </el-descriptions>
 
     <div slot="footer" class="dialog-footer">
-      <el-button @click="visible = false">关闭</el-button>
+      <el-button @click="handleClose">关闭</el-button>
     </div>
   </el-dialog>
 </template>
@@ -34,6 +34,10 @@ export default {
     }
   },
   methods: {
+    handleClose() {
+      // 触发 update:visible 事件以支持 .sync 修饰符
+      this.$emit('update:visible', false);
+    },
     getConnectionStatusType(isOnline) {
       return isOnline ? 'success' : 'danger';
     },

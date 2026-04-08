@@ -191,23 +191,41 @@ public class AgvApiService {
                 result.put("data", parseDataNode(jsonNode.get("data")));
             }
             
-            // 特定命令的响应处理
+            // 特定命令的响应处理 - 根据 type 和 command 判断
             if (jsonNode.has("type")) {
                 String type = jsonNode.get("type").asText();
                 result.put("responseType", type);
                 
-                switch (type) {
-                    case "move_result":
-                        handleMoveResult(result, jsonNode);
-                        break;
-                    case "robot_status":
+                // 如果是 response 类型，根据 command 字段判断具体类型
+                if ("response".equals(type) && jsonNode.has("command")) {
+                    String command = jsonNode.get("command").asText();
+                    System.out.println("收到响应，command: " + command);
+                    
+                    // ✅ 使用 startsWith 匹配，支持带参数的命令
+                    if (command.startsWith("/api/robot_status")) {
                         handleRobotStatus(result, jsonNode);
-                        break;
-                    case "position_info":
+                    } else if (command.startsWith("/api/move")) {
+                        handleMoveResult(result, jsonNode);
+                    } else if (command.startsWith("/api/get_position")) {
                         handlePositionInfo(result, jsonNode);
-                        break;
-                    default:
-                        System.out.println("未知响应类型：" + type);
+                    } else {
+                        System.out.println("未知 command 类型：" + command);
+                    }
+                } else {
+                    // 旧的响应格式，直接根据 type 判断
+                    switch (type) {
+                        case "move_result":
+                            handleMoveResult(result, jsonNode);
+                            break;
+                        case "robot_status":
+                            handleRobotStatus(result, jsonNode);
+                            break;
+                        case "position_info":
+                            handlePositionInfo(result, jsonNode);
+                            break;
+                        default:
+                            System.out.println("未知响应类型：" + type);
+                    }
                 }
             }
             
@@ -253,14 +271,63 @@ public class AgvApiService {
      */
     private void handleMoveResult(Map<String, Object> result, JsonNode jsonNode) {
         System.out.println("处理移动结果响应");
-        if (jsonNode.has("data")) {
-            JsonNode dataNode = jsonNode.get("data");
-            if (dataNode.has("success")) {
-                result.put("moveSuccess", dataNode.get("success").asBoolean());
+        
+        // ✅ 提取 results 中的 current_pose 坐标信息（如果存在）
+        if (jsonNode.has("results")) {
+            JsonNode resultsNode = jsonNode.get("results");
+            
+            if (resultsNode.has("current_pose")) {
+                JsonNode currentPoseNode = resultsNode.get("current_pose");
+                
+                if (currentPoseNode.has("x")) {
+                    double x = currentPoseNode.get("x").asDouble();
+                    result.put("positionX", x);
+                    System.out.println("✅ 移动响应中包含 X 坐标：" + x);
+                }
+                if (currentPoseNode.has("y")) {
+                    double y = currentPoseNode.get("y").asDouble();
+                    result.put("positionY", y);
+                    System.out.println("✅ 移动响应中包含 Y 坐标：" + y);
+                }
+                if (currentPoseNode.has("theta")) {
+                    double theta = currentPoseNode.get("theta").asDouble();
+                    result.put("theta", theta);
+                    System.out.println("✅ 移动响应中包含角度：" + theta);
+                }
             }
-            if (dataNode.has("target_location")) {
-                result.put("targetLocation", dataNode.get("target_location").asText());
+            
+            // 提取电量信息
+            if (resultsNode.has("power_percent")) {
+                result.put("power_percent", resultsNode.get("power_percent").asDouble());
             }
+        }
+        
+        // 提取移动任务 ID
+        if (jsonNode.has("task_id")) {
+            String taskId = jsonNode.get("task_id").asText();
+            result.put("taskId", taskId);
+            System.out.println("移动任务 ID: " + taskId);
+        }
+        
+        // 检查移动状态
+        if (jsonNode.has("status")) {
+            String status = jsonNode.get("status").asText();
+            result.put("moveStatus", status);
+            System.out.println("移动状态: " + status);
+            
+            // 如果移动成功，延迟查询新位置
+            if ("OK".equals(status)) {
+                System.out.println("✅ 移动命令执行成功，将在 3 秒后查询新位置...");
+                // 注意：这里不直接调用，因为需要异步执行
+                // 实际的位置查询会通过前端或定时任务触发
+            }
+        }
+        
+        // 提取错误信息（如果有）
+        if (jsonNode.has("error_message") && !jsonNode.get("error_message").asText().isEmpty()) {
+            String errorMsg = jsonNode.get("error_message").asText();
+            result.put("errorMessage", errorMsg);
+            System.err.println("⚠️ 移动错误: " + errorMsg);
         }
     }
 
@@ -269,7 +336,49 @@ public class AgvApiService {
      */
     private void handleRobotStatus(Map<String, Object> result, JsonNode jsonNode) {
         System.out.println("处理机器人状态响应");
-        if (jsonNode.has("data")) {
+        
+        // 根据你的描述，响应格式应该是：
+        // {"type": "response", "command": "/api/robot_status", ..., "results": {...}}
+        if (jsonNode.has("results")) {
+            JsonNode resultsNode = jsonNode.get("results");
+            
+            // 提取 current_pose 中的坐标信息
+            if (resultsNode.has("current_pose")) {
+                JsonNode currentPoseNode = resultsNode.get("current_pose");
+                
+                if (currentPoseNode.has("x")) {
+                    double x = currentPoseNode.get("x").asDouble();
+                    result.put("positionX", x);
+                    System.out.println("X 坐标：" + x);
+                }
+                if (currentPoseNode.has("y")) {
+                    double y = currentPoseNode.get("y").asDouble();
+                    result.put("positionY", y);
+                    System.out.println("Y 坐标：" + y);
+                }
+                if (currentPoseNode.has("theta")) {
+                    double theta = currentPoseNode.get("theta").asDouble();
+                    result.put("theta", theta);
+                    System.out.println("角度：" + theta);
+                }
+            }
+            
+            // 提取其他状态信息
+            extractStatusField(result, resultsNode, "move_target", "目标点位");
+            extractStatusField(result, resultsNode, "move_status", "移动状态");
+            extractStatusField(result, resultsNode, "running_status", "运行状态");
+            extractStatusField(result, resultsNode, "move_retry_times", "重试次数");
+            extractStatusField(result, resultsNode, "charge_state", "充电状态");
+            extractStatusField(result, resultsNode, "soft_estop_state", "软急停状态");
+            extractStatusField(result, resultsNode, "hard_estop_state", "硬急停状态");
+            extractStatusField(result, resultsNode, "estop_state", "急停状态");
+            extractStatusField(result, resultsNode, "power_percent", "电量百分比");
+            extractStatusField(result, resultsNode, "current_floor", "当前楼层");
+            extractStatusField(result, resultsNode, "chargepile_id", "充电桩 ID");
+            extractStatusField(result, resultsNode, "error_code", "错误码");
+            
+        } else if (jsonNode.has("data")) {
+            // 兼容旧的响应格式
             JsonNode dataNode = jsonNode.get("data");
             
             // 提取常见的状态字段

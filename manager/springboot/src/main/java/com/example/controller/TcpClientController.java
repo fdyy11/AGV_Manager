@@ -29,14 +29,14 @@ public class TcpClientController {
     private AgvApiService agvApiService; // 注入 AgvApiService
 
     /**
-     * 连接到指定的AGV服务端
+     * 连接到指定的 AGV 服务端
      */
     @PostMapping("/connect")
     public Result connectToAgv(@RequestParam(required = false) String agvId,
                                @RequestParam(defaultValue = "127.0.0.1") String ip,
                                @RequestParam int port) {  // 移除了默认端口，要求必须提供
-
-        System.out.println("=== 接收到AGV连接请求 ===");
+    
+        System.out.println("=== 接收到 AGV 连接请求 ===");
         System.out.println("参数详情:");
         System.out.println("- agvId: " + agvId);
         System.out.println("- ip: " + ip);
@@ -55,25 +55,27 @@ public class TcpClientController {
                 newAgv.setIpAddress(ip);
                 newAgv.setPort(port);
                 newAgv.setStatus("connected");
+                newAgv.setIsOnline(true);  // ✅ 设置在线状态为 true
                 newAgv.setLastUpdateTime(new Date());
                 agvMapper.insert(newAgv);
             } else {
                 // 存在则复用已有记录
                 agvId = existingAgv.getAgvId();
                 existingAgv.setStatus("connected");
+                existingAgv.setIsOnline(true);  // ✅ 设置在线状态为 true
                 existingAgv.setLastUpdateTime(new Date());
                 agvMapper.updateByAgvId(existingAgv);
             }
-
+    
             // 建立 TCP 连接
             tcpClientService.connectToAgv(agvId, ip, port);
-
+    
             // 更新数据库中的状态为 connected
             agvMapper.updateStatusByAgvId(agvId, "connected");
-
+    
             return Result.success("成功连接到 AGV " + agvId);
         } catch (Exception e) {
-            return Result.error("201", "连接失败: " + e.getMessage());
+            return Result.error("201", "连接失败：" + e.getMessage());
         }
     }
 
@@ -151,9 +153,18 @@ public class TcpClientController {
             }
             
             // 先更新数据库状态
-            System.out.println("准备更新数据库状态为disconnected");
+            System.out.println("准备更新数据库状态为 disconnected");
             agvMapper.updateStatusByAgvId(agvId, "disconnected");
-            System.out.println("数据库状态已更新为disconnected");
+            System.out.println("数据库状态已更新为 disconnected");
+                        
+            // ✅ 额外更新 is_online 字段为 false
+            Agv agvToUpdate = agvMapper.selectByAgvId(agvId);
+            if (agvToUpdate != null) {
+                agvToUpdate.setIsOnline(false);
+                agvToUpdate.setStatus("disconnected");
+                agvMapper.updateByAgvId(agvToUpdate);
+                System.out.println("✅ 已设置 is_online=false");
+            }
             
             // 再断开TCP连接
             System.out.println("准备断开TCP连接");

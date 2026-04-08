@@ -548,18 +548,28 @@ export default {
           try {
             const data = JSON.parse(event.data);
             console.log('收到 WebSocket 消息:', data);
-
-            // 如果是 AGV 响应数据，添加到日志
+            
+            // 无论什么消息都先显示出来
+            this.addLog({
+              type: 'receive',
+              command: data.command || data.responseType || data.type || 'WebSocket 消息',
+              status: data.parseSuccess !== undefined ? (data.parseSuccess ? 'success' : 'failed') : 'unknown',
+              data: data
+            });
+            
+            // 如果是 AGV 响应数据，额外显示详细信息
             if (data.agvId || data.command || data.responseType) {
-              this.addLog({
-                type: 'receive',
-                command: data.command || data.responseType || 'AGV 响应',
-                status: data.parseSuccess ? 'success' : 'failed',
-                data: data
-              });
+              console.log('[AGV 响应] 详细数据:', data);
             }
           } catch (err) {
             console.error('处理 WebSocket 消息错误:', err);
+            // 即使解析失败也显示原始消息
+            this.addLog({
+              type: 'error',
+              command: 'WebSocket 原始消息',
+              status: 'parse_error',
+              data: { raw: event.data, error: err.message }
+            });
           }
         };
 

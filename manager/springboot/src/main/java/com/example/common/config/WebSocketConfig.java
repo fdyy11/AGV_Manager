@@ -16,7 +16,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        System.out.println("=== WebSocket 配置初始化 ===");
+        System.out.println("注册 WebSocket 处理器：TcpStatusWebSocketHandler");
+        System.out.println("路径：/ws/tcp-status");
         registry.addHandler(tcpStatusWebSocketHandler, "/ws/tcp-status")
                 .setAllowedOrigins("*");
+        System.out.println("WebSocket 配置完成");
     }
 }
